@@ -1,0 +1,10 @@
+export { TypeScriptCompilerError } from '../errors/type-script-compiler.error';
+export type { TypeScriptCompiler } from '../types/type-script-compiler.type';
+export type { TypeScriptOptions } from '../types/type-script-options.type';
+export type { TypeScriptProgram } from '../types/type-script-program.type';
+export type { WireLiteralScan } from '../types/wire-literal-scan.type';
+export { createProgram } from './create-program';
+export { findWireLiterals } from './find-wire-literals';
+export { shapeFromTypeScript } from './shape-from-type-script';
+export { typeScriptContract } from './type-script-contract';
+export { wireFromTypeScript } from './wire-from-type-script';

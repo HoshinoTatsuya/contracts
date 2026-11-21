@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm run lint
+      # End-to-end specs create throwaway git repositories (both sides of a contract); git is on the runner.
+      # TypeScript parsing tables run on 5.9 and the typescript-6 / typescript-7 / typescript-7-1 aliases.
+      - run: pnpm test
+      # Consumer matrix: the packed package in CJS/ESM projects with typescript 5.9, 6.0, 7.0 and 7.1 beta.
+      - run: pnpm run test:consumers
+      - run: pnpm run build
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jest-report
+          path: .jest-report.json
+          if-no-files-found: ignore
+          retention-days: 7

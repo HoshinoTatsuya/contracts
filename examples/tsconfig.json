@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    "types": ["node", "jest"],
+    "paths": {
+      "@hoshinotatsuya/contracts": ["../src/index.ts"],
+      "@hoshinotatsuya/contracts/jest": ["../src/jest/index.ts"],
+      "@hoshinotatsuya/contracts/typescript": ["../src/typescript/index.ts"]
+    }
+  },
+  "include": ["."]
+}
