@@ -26,8 +26,12 @@ afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-/** Дочерние процессы этого воркера (pgrep не считает себя); снятый процесс уходит не мгновенно — ждём до 2 с. */
-const children = (expected?: number): number => {
+/**
+ * Дочерние процессы этого воркера (pgrep не считает себя); снятый процесс уходит не мгновенно — ждём до 2 с.
+ * Ожидание асинхронное: завершившегося потомка забирает цикл событий Node (SIGCHLD → waitpid в libuv).
+ * Синхронное ожидание блокирует цикл, и на Linux потомок висит зомби, которого pgrep -P считает.
+ */
+const children = async (expected?: number): Promise<number> => {
   let count = -1;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const listed = spawnSync('pgrep', ['-P', String(process.pid)], { encoding: 'utf8' }).stdout;
@@ -35,7 +39,7 @@ const children = (expected?: number): number => {
     if (expected === undefined || count === expected) {
       return count;
     }
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+    await new Promise((resolve) => setTimeout(resolve, 50));
   }
   return count;
 };
@@ -43,17 +47,17 @@ const children = (expected?: number): number => {
 describe.each(COMPILERS)('программа TypeScript — %s (%s)', (compiler, version) => {
   const native = version.startsWith('7.');
 
-  it('у TS 7 программа — процесс: createProgram добавляет один, dispose снимает; повторный dispose — без действия', () => {
-    const before = children();
+  it('у TS 7 программа — процесс: createProgram добавляет один, dispose снимает; повторный dispose — без действия', async () => {
+    const before = await children();
     const program = createProgram([file], { compiler });
-    expect(children(before + (native ? 1 : 0))).toBe(before + (native ? 1 : 0));
+    expect(await children(before + (native ? 1 : 0))).toBe(before + (native ? 1 : 0));
     program.dispose();
     program.dispose();
-    expect(children(before)).toBe(before);
+    expect(await children(before)).toBe(before);
   });
 
-  it('вызовы, собравшие программу сами, не оставляют процессов — и при отказе разбора тоже', () => {
-    const before = children();
+  it('вызовы, собравшие программу сами, не оставляют процессов — и при отказе разбора тоже', async () => {
+    const before = await children();
     shapeFromTypeScript({ file, type: 'Dto', compiler });
     wireFromTypeScript({ file, names: ['Q'], compiler });
     expect(() => shapeFromTypeScript({ file, type: 'Missing', compiler })).toThrow('объявление не найдено');
@@ -69,7 +73,7 @@ describe.each(COMPILERS)('программа TypeScript — %s (%s)', (compiler,
       files: 1,
       hits: [{ file: 'use.ts', line: 1, value: 'q:a' }],
     });
-    expect(children(before)).toBe(before);
+    expect(await children(before)).toBe(before);
   });
 
   it('закрытая программа — отказ с причиной, а не TypeError из канала к процессу', () => {
