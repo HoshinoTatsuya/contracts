@@ -27,15 +27,22 @@ afterAll(() => {
 });
 
 /**
- * Дочерние процессы этого воркера (pgrep не считает себя); снятый процесс уходит не мгновенно — ждём до 2 с.
+ * Живые дочерние процессы этого воркера; снятый процесс уходит не мгновенно — ждём до 2 с.
  * Ожидание асинхронное: завершившегося потомка забирает цикл событий Node (SIGCHLD → waitpid в libuv).
  * Синхронное ожидание блокирует цикл, и на Linux потомок висит зомби, которого pgrep -P считает.
  */
 const children = async (expected?: number): Promise<number> => {
   let count = -1;
   for (let attempt = 0; attempt < 40; attempt += 1) {
-    const listed = spawnSync('pgrep', ['-P', String(process.pid)], { encoding: 'utf8' }).stdout;
-    count = listed.split('\n').filter(Boolean).length;
+    // Живые потомки: завершённый, но ещё не забранный (зомби, состояние Z) — не процесс, и счёт по нему
+    // плавает от того, когда цикл событий успел его забрать. ps -A -o ppid=,stat= — и Linux, и macOS.
+    const listed = spawnSync('ps', ['-A', '-o', 'ppid=,stat='], { encoding: 'utf8' }).stdout;
+    count = listed
+      .split('\n')
+      .map((line) => line.trim().split(/\s+/))
+      .filter(
+        ([ppid, stat]) => Number(ppid) === process.pid && stat !== undefined && !stat.startsWith('Z'),
+      ).length;
     if (expected === undefined || count === expected) {
       return count;
     }
