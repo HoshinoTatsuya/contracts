@@ -120,17 +120,25 @@ describe('gateChecks: состав', () => {
 
 describe('gateChecks: снимок и выборка', () => {
   it('нет закоммиченного снимка — красная; CONTRACTS_UPDATE=1 записывает через форматтер; совпал — зелёная', () => {
-    const [committed] = gateChecks(options()).checks;
-    expect(run(committed)).toBe(
-      'Error: нет закоммиченного снимка contracts.snapshot.json: собрать — CONTRACTS_UPDATE=1',
-    );
-    process.env[CONTRACT_FORMAT.UPDATE_ENV] = '1';
-    const formatted: string[] = [];
-    const [updating] = gateChecks(options({ formatter: (file) => formatted.push(file) })).checks;
-    expect(run(updating)).toBe('ok');
-    expect(formatted).toEqual([join(root, 'contracts.snapshot.json')]);
-    process.env[CONTRACT_FORMAT.UPDATE_ENV] = '0';
-    expect(run(gateChecks(options()).checks[0])).toBe('ok');
+    // Запись снимка разрешена только вне CI (отказ в CI — отдельная проверка): переменную CI раннера убрать.
+    const savedCi = process.env.CI;
+    delete process.env.CI;
+    try {
+      const [committed] = gateChecks(options()).checks;
+      expect(run(committed)).toBe(
+        'Error: нет закоммиченного снимка contracts.snapshot.json: собрать — CONTRACTS_UPDATE=1',
+      );
+      process.env[CONTRACT_FORMAT.UPDATE_ENV] = '1';
+      const formatted: string[] = [];
+      const [updating] = gateChecks(options({ formatter: (file) => formatted.push(file) })).checks;
+      expect(run(updating)).toBe('ok');
+      expect(formatted).toEqual([join(root, 'contracts.snapshot.json')]);
+      process.env[CONTRACT_FORMAT.UPDATE_ENV] = '0';
+      expect(run(gateChecks(options()).checks[0])).toBe('ok');
+    } finally {
+      if (savedCi === undefined) delete process.env.CI;
+      else process.env.CI = savedCi;
+    }
   });
 
   it('снимок устарел — красная с именем контракта', () => {

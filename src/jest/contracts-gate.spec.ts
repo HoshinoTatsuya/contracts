@@ -59,6 +59,11 @@ interface Outcome {
   readonly suiteError: string;
 }
 
+const withoutCi = (source: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
+  const { CI: _ci, ...rest } = source;
+  return rest;
+};
+
 const run = (env: Record<string, string> = {}): Outcome => {
   writeFileSync(join(root, 'gate.spec.js'), GATE_SPEC);
   const config = join(root, 'jest.config.json');
@@ -88,7 +93,8 @@ const run = (env: Record<string, string> = {}): Outcome => {
     {
       cwd: env.CWD ?? root,
       encoding: 'utf8',
-      env: { ...process.env, PEER, ...env },
+      // Проект-фикстура — как у разработчика: CI раннера убран (запись снимка в CI — отказ, это отдельная проверка).
+      env: { ...withoutCi(process.env), PEER, ...env },
       timeout: 50_000,
     },
   );
